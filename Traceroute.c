@@ -10,7 +10,6 @@
 #include <stdint.h>          // exact-width integer type
 #include <sys/time.h>        // time related operation
 
-
 #define MY_PORT 50000
 #define DEFAULT_RECV_TIMEOUT 3
 
@@ -79,7 +78,7 @@ int8_t socketConfigure()
     myaddr.sin_port = htons(MY_PORT);
 
     // binding traceroute to a specific ip/port
-    if (bind(socket_data->sockfd, &myaddr, sizeof(myaddr)) < 0)
+    if (bind(socket_data->sockfd, (const struct sockaddr *)&myaddr, sizeof(myaddr)) < 0)
     {
         perror("BIND FAILED");
         return -1;
@@ -88,14 +87,15 @@ int8_t socketConfigure()
     // Setting CUSTOM RECV TIMER
     uint8_t timeout_s = socket_data->trace_data->timeout == 0 ? DEFAULT_RECV_TIMEOUT : socket_data->trace_data->timeout;
     struct timeval tv = {timeout_s, 0};
-    if (setsockopt(socket_data->sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+    if (setsockopt(socket_data->sockfd, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tv, sizeof(tv)) < 0)
     {
         perror("CUSTOM RECV TIME FAILED");
         return -1;
     }
     // Setting ICMP ERROR RECEPTION
     uint8_t enable = 1;
-    if(setsockopt(socket_data->sockfd,IPPROTO_IP,IP_RECVERR,enable,sizeof(enable)) < 0){
+    if (setsockopt(socket_data->sockfd, IPPROTO_IP, IP_RECVERR, (const void*)&enable, sizeof(enable)) < 0)
+    {
         perror("ICMP ERROR RECEPTION ON FAILED");
         return -1;
     }
