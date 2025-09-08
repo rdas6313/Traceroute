@@ -33,6 +33,12 @@ typedef struct SocketIn_t
     TraceIn_t *trace_data;
 } SocketIn_t;
 
+typedef struct ProbeTime_t
+{
+    struct timeval send_time;
+    struct timeval recv_time;
+} ProbeTime_t;
+
 SocketIn_t *socket_data;
 
 TraceIn_t *configureTrace(void)
@@ -94,10 +100,38 @@ int8_t socketConfigure()
     }
     // Setting ICMP ERROR RECEPTION
     uint8_t enable = 1;
-    if (setsockopt(socket_data->sockfd, IPPROTO_IP, IP_RECVERR, (const void*)&enable, sizeof(enable)) < 0)
+    if (setsockopt(socket_data->sockfd, IPPROTO_IP, IP_RECVERR, (const void *)&enable, sizeof(enable)) < 0)
     {
         perror("ICMP ERROR RECEPTION ON FAILED");
         return -1;
     }
     return 1;
 }
+
+
+
+int8_t sendProbeMsg(ProbeTime_t *ptime, int total_probe)
+{
+
+    const char *dest_ip = socket_data->trace_data->des_ip;
+    uint16_t dest_port = socket_data->trace_data->des_port;
+    struct sockaddr_in dest_addr;
+    memset(&dest_addr, 0, sizeof(dest_addr));
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(dest_port);
+    inet_pton(AF_INET, dest_ip, &dest_addr.sin_addr);
+
+    for (int i = 0; i < total_probe; i++)
+    {
+
+        if (sendto(socket_data->sockfd, NULL, 0, 0, (const struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0)
+        {
+            perror("UDP PACKET SEND ERROR");
+            return -1;
+        }
+        gettimeofday(&ptime[i].send_time, NULL);
+        dest_port += 1;
+    }
+    return 1;
+}
+
