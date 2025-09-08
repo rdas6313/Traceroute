@@ -9,9 +9,14 @@
 #include <netinet/ip_icmp.h> // struct icmphdr, ICMP types
 #include <stdint.h>          // exact-width integer type
 #include <sys/time.h>        // time related operation
+#include <linux/errqueue.h>  // ErrorQueue header
 
 #define MY_PORT 50000
 #define DEFAULT_RECV_TIMEOUT 3
+#define BUFFER_SIZE 1500
+#define TYPE_TTL_EXPIRED 11
+#define CODE_TTL_EXPIRED 0
+#define ICMP_TTL_EXPIRED 1
 
 /*
  *   Trace related option from user
@@ -33,11 +38,13 @@ typedef struct SocketIn_t
     TraceIn_t *trace_data;
 } SocketIn_t;
 
-typedef struct ProbeTime_t
+typedef struct ProbeMsg_t
 {
     struct timeval send_time;
     struct timeval recv_time;
-} ProbeTime_t;
+    char offender_ip[33];
+    uint8_t icmp_error;
+} ProbeMsg_t;
 
 SocketIn_t *socket_data;
 
@@ -108,9 +115,7 @@ int8_t socketConfigure()
     return 1;
 }
 
-
-
-int8_t sendProbeMsg(ProbeTime_t *ptime, int total_probe)
+int8_t sendProbeMsg(ProbeMsg_t *pmsg, int total_probe)
 {
 
     const char *dest_ip = socket_data->trace_data->des_ip;
@@ -129,8 +134,80 @@ int8_t sendProbeMsg(ProbeTime_t *ptime, int total_probe)
             perror("UDP PACKET SEND ERROR");
             return -1;
         }
-        gettimeofday(&ptime[i].send_time, NULL);
+        gettimeofday(&pmsg[i].send_time, NULL);
         dest_port += 1;
+    }
+    return 1;
+}
+
+int8_t changeTTL(int8_t ttl)
+{
+    if (setsockopt(socket_data->sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) < 0)
+    {
+        perror("TTL SETTING FAILED");
+        return -1;
+    }
+    return 1;
+}
+
+int8_t captureICMP(ProbeMsg_t *pmsg, uint8_t total_probe)
+{
+    char buffer[BUFFER_SIZE];           //store data of ICMP
+    char control_buffer[BUFFER_SIZE];   //store control msgs 
+    struct iovec iov;
+    struct msghdr msg;
+
+    //initializing buffer 
+    memset(&iov, 0, sizeof(iov));
+    iov.iov_base = buffer;
+    iov.iov_len = sizeof(buffer);
+
+    //initializing special structure msg which will capture icmp and icmp data
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = control_buffer;
+    msg.msg_controllen = sizeof(control_buffer);
+    // add msg name also if needed
+
+    for (int i = 0; i < total_probe; i++)
+    {
+        //initializing data buffer,control buffer and ip of router which will send icmp
+        memset(buffer, 0, sizeof(buffer));
+        memset(control_buffer, 0, sizeof(control_buffer));  
+        memset(pmsg[i].offender_ip, 0, sizeof(pmsg[i].offender_ip));
+        
+        //recving only Error Queue packets
+        if (recvmsg(socket_data->sockfd, &msg, MSG_ERRQUEUE) < 0)
+        {
+            perror("RECVMSG ERROR");
+            return -1;
+        }
+
+        //saving recv time of icmp.
+        gettimeofday(&pmsg[i].recv_time, NULL);
+
+        //Checking each control msg to get icmp error type,code and offender ip
+        struct cmsghdr *cmsg;
+        for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg))
+        {
+            if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVERR)
+            {
+                struct sock_extended_err *error = (struct sock_extended_err *)CMSG_DATA(cmsg);
+                struct sockaddr_in *offender_ip = (struct sockaddr_in *)SO_EE_OFFENDER(error);
+
+                if (error == NULL || error->ee_origin != SO_EE_ORIGIN_ICMP)
+                    continue;
+                
+                // if error type is TTL expired and code TTL expired then mark this probe as ICMP TTL Expired and if offender ip present record it.
+                if (error->ee_type == TYPE_TTL_EXPIRED && error->ee_code == CODE_TTL_EXPIRED)
+                {
+                    pmsg[i].icmp_error = ICMP_TTL_EXPIRED;
+                    if (offender_ip != NULL)
+                        inet_ntop(AF_INET, &offender_ip->sin_addr, pmsg[i].offender_ip, sizeof(pmsg[i].offender_ip));
+                }
+            }
+        }
     }
     return 1;
 }
