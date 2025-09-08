@@ -10,6 +10,7 @@
 #include <stdint.h>          // exact-width integer type
 #include <sys/time.h>        // time related operation
 #include <linux/errqueue.h>  // ErrorQueue header
+#include <errno.h>           // defines errno, EAGAIN, EWOULDBLOCK, etc.
 
 #define MY_PORT 50000
 #define DEFAULT_RECV_TIMEOUT 3
@@ -17,6 +18,7 @@
 #define TYPE_TTL_EXPIRED 11
 #define CODE_TTL_EXPIRED 0
 #define ICMP_TTL_EXPIRED 1
+#define ICMP_UNREACHABLE 2
 
 /*
  *   Trace related option from user
@@ -29,7 +31,7 @@ typedef struct TraceIn_t
     uint8_t skip_dns;
     uint16_t des_port;
     uint32_t des_ip;
-    void (*callback)();
+    void (*callback)(uint8_t ms1, uint8_t ms2, uint8_t ms3, char offender_ip[]);
 } TraceIn_t;
 
 typedef struct SocketIn_t
@@ -152,17 +154,17 @@ int8_t changeTTL(int8_t ttl)
 
 int8_t captureICMP(ProbeMsg_t *pmsg, uint8_t total_probe)
 {
-    char buffer[BUFFER_SIZE];           //store data of ICMP
-    char control_buffer[BUFFER_SIZE];   //store control msgs 
+    char buffer[BUFFER_SIZE];         // store data of ICMP
+    char control_buffer[BUFFER_SIZE]; // store control msgs
     struct iovec iov;
     struct msghdr msg;
 
-    //initializing buffer 
+    // initializing buffer
     memset(&iov, 0, sizeof(iov));
     iov.iov_base = buffer;
     iov.iov_len = sizeof(buffer);
 
-    //initializing special structure msg which will capture icmp and icmp data
+    // initializing special structure msg which will capture icmp and icmp data
     memset(&msg, 0, sizeof(msg));
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
@@ -172,22 +174,29 @@ int8_t captureICMP(ProbeMsg_t *pmsg, uint8_t total_probe)
 
     for (int i = 0; i < total_probe; i++)
     {
-        //initializing data buffer,control buffer and ip of router which will send icmp
+        // initializing data buffer,control buffer and ip of router which will send icmp
         memset(buffer, 0, sizeof(buffer));
-        memset(control_buffer, 0, sizeof(control_buffer));  
+        memset(control_buffer, 0, sizeof(control_buffer));
         memset(pmsg[i].offender_ip, 0, sizeof(pmsg[i].offender_ip));
-        
-        //recving only Error Queue packets
+
+        // recving only Error Queue packets
         if (recvmsg(socket_data->sockfd, &msg, MSG_ERRQUEUE) < 0)
-        {
-            perror("RECVMSG ERROR");
-            return -1;
+        {   // if errno is EAGAIN or EWOULDBLOCK then Msg queue is empty and timeout happened
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                return 1;
+            }
+            else  // otherwise some error happened, record it
+            {
+                perror("RECVMSG ERROR");
+                return -1;
+            }
         }
 
-        //saving recv time of icmp.
+        // saving recv time of icmp.
         gettimeofday(&pmsg[i].recv_time, NULL);
 
-        //Checking each control msg to get icmp error type,code and offender ip
+        // Checking each control msg to get icmp error type,code and offender ip
         struct cmsghdr *cmsg;
         for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg))
         {
@@ -198,17 +207,59 @@ int8_t captureICMP(ProbeMsg_t *pmsg, uint8_t total_probe)
 
                 if (error == NULL || error->ee_origin != SO_EE_ORIGIN_ICMP)
                     continue;
-                
-                // if error type is TTL expired and code TTL expired then mark this probe as ICMP TTL Expired and if offender ip present record it.
+
+                // if error type is TTL expired and code TTL expired then mark this probe as ICMP TTL Expired
                 if (error->ee_type == TYPE_TTL_EXPIRED && error->ee_code == CODE_TTL_EXPIRED)
                 {
                     pmsg[i].icmp_error = ICMP_TTL_EXPIRED;
-                    if (offender_ip != NULL)
-                        inet_ntop(AF_INET, &offender_ip->sin_addr, pmsg[i].offender_ip, sizeof(pmsg[i].offender_ip));
                 }
+                else // if any other icmp error will assume it is Destination not reachable and mark it as unreachable
+                {
+                    pmsg[i].icmp_error = ICMP_UNREACHABLE;
+                }
+                //if offender ip present record it by converting to human readable form.
+                if (offender_ip != NULL)
+                    inet_ntop(AF_INET, &offender_ip->sin_addr, pmsg[i].offender_ip, sizeof(pmsg[i].offender_ip));
             }
         }
     }
     return 1;
 }
 
+int8_t initiate_callback(ProbeMsg_t *probeMsg,uint8_t total_probe){
+
+    uint8_t ms[3] = {0};
+    uint8_t stop = 0;
+    for (int i = 0; i < total_probe; i++)
+    {   
+        // calculating Round trip time
+        ms[i] = ((probeMsg[i].recv_time.tv_sec - probeMsg[i].send_time.tv_sec) * 1000) + ((probeMsg[i].recv_time.tv_usec - probeMsg[i].send_time.tv_usec) / 1000);
+        // if we get ICMP Unreachable then we stop hoping more
+        stop = (probeMsg[i].icmp_error == ICMP_UNREACHABLE) ? 1 : 0;
+    }
+    // calling callback to send probe data to UI
+    socket_data->trace_data->callback(ms[0], ms[1], ms[2], probeMsg[0].offender_ip);
+    return stop;
+}
+
+int8_t start_tracing()
+{
+    uint8_t max_hop = socket_data->trace_data->max_hop;
+    ProbeMsg_t probeMsg[3];
+
+    for (int i = 0; i < max_hop; i++)
+    {
+        memset(probeMsg, 0, sizeof(probeMsg)); // initializing probetime with 0
+        if (changeTTL(i + 1) < 0)              // changing TTL to 0,1,2,3....so on
+            return -1;
+        if (sendProbeMsg(probeMsg, 3) < 0) // sending 3 probe msg for each TTL
+            return -1;
+
+        if (captureICMP(probeMsg, 3) < 0)  // capure 3 probe icmp for each TTL
+            return -1;
+
+        if(initiate_callback(probeMsg, 3) > 0)  // returning value to UI and if initiate_callback return > 0 then if got destination or destination not reachable so, stop here
+            break;
+    }
+    return 1;
+}
