@@ -15,6 +15,10 @@
 #include <sys/time.h>        // time related operation
 #include <linux/errqueue.h>  // ErrorQueue header
 #include <errno.h>           // defines errno, EAGAIN, EWOULDBLOCK, etc.
+#include <netinet/ip.h>      // ip header
+#include <netinet/ip_icmp.h> //icmp header
+#include <netinet/udp.h>     // udp header
+#include <netdb.h>
 
 #define DEFAULT_MAX_HOP 32
 #define DEFAULT_DEST_PORT 40254
@@ -25,6 +29,7 @@
 #define CODE_TTL_EXPIRED 0
 #define ICMP_TTL_EXPIRED 1
 #define ICMP_UNREACHABLE 2
+#define IP_ADDR_LEN 35
 
 /*
  *   Trace related option from user
@@ -36,13 +41,14 @@ typedef struct TraceIn_t
     uint8_t max_hop;
     uint8_t skip_dns;
     uint16_t des_port;
-    uint8_t des_ip[33];
-    void (*callback)(uint8_t ms1, uint8_t ms2, uint8_t ms3, char offender_ip[]);
+    uint8_t des_ip[IP_ADDR_LEN];
+    void (*callback)(double ms1, double ms2, double ms3, char offender_ip1[], char offender_ip2[], char offender_ip3[]);
 } TraceIn_t;
 
 typedef struct SocketIn_t
 {
-    int32_t sockfd;
+    int32_t usock_fd; // for udp
+    int32_t isock_fd; // for icmp
     TraceIn_t *trace_data;
 } SocketIn_t;
 
@@ -50,21 +56,12 @@ typedef struct ProbeMsg_t
 {
     struct timeval send_time;
     struct timeval recv_time;
-    char offender_ip[33];
+    char offender_ip[IP_ADDR_LEN];
     uint8_t icmp_error;
 } ProbeMsg_t;
 
-
-
-// void release_resource(void);
-// uint8_t checkInputError();
-// int8_t socketConfigure();
-// int8_t sendProbeMsg(ProbeMsg_t *pmsg, int total_probe);
-// int8_t changeTTL(int8_t ttl);
-// int8_t captureICMP(ProbeMsg_t *pmsg, uint8_t total_probe);
-// int8_t initiate_callback(ProbeMsg_t *probeMsg, uint8_t total_probe);
-// int8_t start_tracing();
 int8_t startTrace(void);
 TraceIn_t *configureTrace(void);
+int8_t getDomainName(char *ip, char *domain, uint32_t domainSize);
 
 #endif
