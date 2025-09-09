@@ -47,12 +47,12 @@ uint8_t checkInputError()
 {
     if (socket_data == NULL)
     {
-        perror("SOCKETDATA NOT INTIALIZED");
+        PRINT_ERROR("SOCKETDATA NOT INTIALIZED");
         return -1;
     }
     else if (socket_data->trace_data == NULL)
     {
-        perror("TRACEDATA NOT INITIALIZED");
+        PRINT_ERROR("TRACEDATA NOT INITIALIZED");
         return -1;
     }
     else if (socket_data->trace_data->timeout == 0)
@@ -63,12 +63,12 @@ uint8_t checkInputError()
         socket_data->trace_data->max_hop = DEFAULT_MAX_HOP;
     else if (socket_data->trace_data->callback == NULL)
     {
-        perror("CALLBACK ERROR");
+        PRINT_ERROR("CALLBACK ERROR");
         return -1;
     }
     else if (strcmp(socket_data->trace_data->des_ip, "") == 0)
     {
-        perror("DESTINATION IP ERROR");
+        PRINT_ERROR("DESTINATION IP ERROR");
         return -1;
     }
     return 1;
@@ -78,12 +78,12 @@ int8_t socketConfigure()
 {
     if (socket_data == NULL)
     {
-        perror("SOCKETDATA: NOT INTIALIZED");
+        PRINT_ERROR("SOCKETDATA: NOT INTIALIZED");
         return -1;
     }
     else if (socket_data->trace_data == NULL)
     {
-        perror("TRACEDATA: NOT INTIALIZED");
+        PRINT_ERROR("TRACEDATA: NOT INTIALIZED");
         return -1;
     }
 
@@ -96,7 +96,7 @@ int8_t socketConfigure()
 
     if (socket_data->usock_fd < 0)
     {
-        perror("UDP SOCKET INTIALIZATION ERROR");
+        PRINT_ERROR("UDP SOCKET INTIALIZATION ERROR");
         return -1;
     }
     // initialization for socket address
@@ -109,7 +109,7 @@ int8_t socketConfigure()
     // binding traceroute to a specific ip/port
     if (bind(socket_data->usock_fd, (const struct sockaddr *)&myaddr, sizeof(myaddr)) < 0)
     {
-        perror("BIND FAILED");
+        PRINT_ERROR("BIND FAILED");
         return -1;
     }
 
@@ -117,7 +117,7 @@ int8_t socketConfigure()
     socket_data->isock_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (socket_data->isock_fd < 0)
     {
-        perror("RAW SOCKET INTIALIZATION ERROR");
+        PRINT_ERROR("RAW SOCKET INTIALIZATION ERROR");
         return -1;
     }
 
@@ -127,7 +127,7 @@ int8_t socketConfigure()
     tv.tv_usec = 0;
     if (setsockopt(socket_data->isock_fd, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tv, sizeof(tv)) < 0)
     {
-        perror("RECV TIME SET ERROR");
+        PRINT_ERROR("RECV TIME SET ERROR");
         return -1;
     }
     return 1;
@@ -150,7 +150,7 @@ int8_t sendProbeMsg(ProbeMsg_t *pmsg, int total_probe)
         dest_addr.sin_port = htons(dest_port);
         if (sendto(socket_data->usock_fd, dummy_data, 256, 0, (const struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0)
         {
-            perror("UDP PACKET SEND ERROR");
+            PRINT_ERROR("UDP PACKET SEND ERROR");
             return -1;
         }
         gettimeofday(&pmsg[i].send_time, NULL);
@@ -163,7 +163,7 @@ int8_t changeTTL(uint32_t ttl)
 {
     if (setsockopt(socket_data->usock_fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) < 0)
     {
-        perror("TTL SETTING FAILED");
+        PRINT_ERROR("TTL SETTING FAILED");
         return -1;
     }
 #ifdef DEBUG
@@ -202,7 +202,7 @@ int8_t captureICMP(ProbeMsg_t *pmsg, uint8_t total_probe)
 #endif
             }
             else
-                perror("RECV FROM ERROR");
+                PRINT_ERROR("RECV FROM ERROR");
             return 1;
         }
 
@@ -222,7 +222,7 @@ int8_t captureICMP(ProbeMsg_t *pmsg, uint8_t total_probe)
 #endif
         if (index < 0 || index >= total_probe)
         {
-            perror("Index Error");
+            PRINT_ERROR("Index Error");
             continue;
         }
 

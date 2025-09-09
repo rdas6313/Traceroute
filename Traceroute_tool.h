@@ -30,6 +30,14 @@
 #define ICMP_TTL_EXPIRED 1
 #define ICMP_UNREACHABLE 2
 #define IP_ADDR_LEN 35
+#define PRINT_ERROR(msg)                                                                        \
+    do                                                                                          \
+    {                                                                                           \
+        if (socket_data && socket_data->trace_data && socket_data->trace_data->show_error == 1) \
+        {                                                                                       \
+            perror(msg);                                                                        \
+        }                                                                                       \
+    } while (0)
 
 /*
  *   Trace related option from user
@@ -37,6 +45,7 @@
  */
 typedef struct TraceIn_t
 {
+    uint8_t show_error;
     uint8_t timeout;
     uint8_t max_hop;
     uint8_t skip_dns;
