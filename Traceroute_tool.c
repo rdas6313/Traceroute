@@ -55,13 +55,13 @@ uint8_t checkInputError()
         PRINT_ERROR("TRACEDATA NOT INITIALIZED");
         return -1;
     }
-    else if (socket_data->trace_data->timeout == 0)
+    if (socket_data->trace_data->timeout == 0)
         socket_data->trace_data->timeout = DEFAULT_RECV_TIMEOUT;
-    else if (socket_data->trace_data->des_port == 0)
+    if (socket_data->trace_data->des_port == 0)
         socket_data->trace_data->des_port = DEFAULT_DEST_PORT;
-    else if (socket_data->trace_data->max_hop == 0)
+    if (socket_data->trace_data->max_hop == 0)
         socket_data->trace_data->max_hop = DEFAULT_MAX_HOP;
-    else if (socket_data->trace_data->callback == NULL)
+    if (socket_data->trace_data->callback == NULL)
     {
         PRINT_ERROR("CALLBACK ERROR");
         return -1;
@@ -71,6 +71,16 @@ uint8_t checkInputError()
         PRINT_ERROR("DESTINATION IP ERROR");
         return -1;
     }
+#ifdef DEBUG
+    printf("................................................\n");
+    printf("Destination ip: %s\n", socket_data->trace_data->des_ip);
+    printf("Destination port: %d\n", socket_data->trace_data->des_port);
+    printf("Max hop: %d\n", socket_data->trace_data->max_hop);
+    printf("Timeout: %d\n", socket_data->trace_data->timeout);
+    printf("Error show: %d\n", socket_data->trace_data->show_error);
+    printf("Skip Dns: %d\n", socket_data->trace_data->skip_dns);
+    printf("................................................\n");
+#endif
     return 1;
 }
 
@@ -259,7 +269,7 @@ int8_t initiate_callback(ProbeMsg_t *probeMsg, uint8_t total_probe)
         stop = (probeMsg[i].icmp_error == ICMP_UNREACHABLE) ? 1 : 0;
     }
     // calling callback to send probe data to UI
-    socket_data->trace_data->callback(ms[0], ms[1], ms[2], probeMsg[0].offender_ip, probeMsg[1].offender_ip, probeMsg[2].offender_ip);
+    socket_data->trace_data->callback(ms[0], ms[1], ms[2], probeMsg[0].offender_ip, probeMsg[1].offender_ip, probeMsg[2].offender_ip, socket_data->trace_data->skip_dns);
     return stop;
 }
 
@@ -322,6 +332,9 @@ TraceIn_t *configureTrace(void) // UI API Function
     {
         socket_data = (SocketIn_t *)malloc(sizeof(SocketIn_t));
         socket_data->trace_data = (TraceIn_t *)malloc(sizeof(TraceIn_t));
+#ifdef DEBUG
+        printf("Memory Allocated for Socket_data and Trace_data\n");
+#endif
     }
     memset(socket_data->trace_data, 0, sizeof(*socket_data->trace_data));
     socket_data->usock_fd = 0;

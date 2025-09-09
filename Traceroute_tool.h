@@ -20,10 +20,15 @@
 #include <netinet/udp.h>     // udp header
 #include <netdb.h>
 
+#define RED "\x1b[31m"
+#define GREEN "\x1b[32m"
+#define RESET "\x1b[0m"
+#define YELLOW "\x1b[33m"
+
 #define DEFAULT_MAX_HOP 32
-#define DEFAULT_DEST_PORT 40254
+#define DEFAULT_DEST_PORT 33454
 #define MY_PORT 50000
-#define DEFAULT_RECV_TIMEOUT 3 // in sec
+#define DEFAULT_RECV_TIMEOUT 2 // in sec
 #define BUFFER_SIZE 1500
 #define TYPE_TTL_EXPIRED 11
 #define CODE_TTL_EXPIRED 0
@@ -35,7 +40,7 @@
     {                                                                                           \
         if (socket_data && socket_data->trace_data && socket_data->trace_data->show_error == 1) \
         {                                                                                       \
-            perror(msg);                                                                        \
+            perror(RED msg RESET);                                                              \
         }                                                                                       \
     } while (0)
 
@@ -51,7 +56,7 @@ typedef struct TraceIn_t
     uint8_t skip_dns;
     uint16_t des_port;
     uint8_t des_ip[IP_ADDR_LEN];
-    void (*callback)(double ms1, double ms2, double ms3, char offender_ip1[], char offender_ip2[], char offender_ip3[]);
+    void (*callback)(double ms1, double ms2, double ms3, char offender_ip1[], char offender_ip2[], char offender_ip3[], char skip_dns);
 } TraceIn_t;
 
 typedef struct SocketIn_t
