@@ -13,7 +13,6 @@
 #include <netinet/ip_icmp.h> // struct icmphdr, ICMP types
 #include <stdint.h>          // exact-width integer type
 #include <sys/time.h>        // time related operation
-#include <linux/errqueue.h>  // ErrorQueue header
 #include <errno.h>           // defines errno, EAGAIN, EWOULDBLOCK, etc.
 #include <netinet/ip.h>      // ip header
 #include <netinet/ip_icmp.h> //icmp header
