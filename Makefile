@@ -13,4 +13,4 @@ DEBUG:
 	make
 
 clear:
-	rm -f *.o 
+	rm -f *.o Traceroute

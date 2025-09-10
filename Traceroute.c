@@ -46,6 +46,26 @@ void getTrace(double ms1, double ms2, double ms3, char offender_ip1[], char offe
     printf("\n");
 }
 
+char is_valid_octet(char *token)
+{
+    char len = strlen(token);
+    if (len > 3 || len == 0)
+        return 0;
+
+    long int val = strtol(token, NULL, 10);
+    if (val == 0)
+    {
+        for (int i = 0; i < len; i++)
+        {
+            if (token[i] != '0')
+                return 0;
+        }
+    }
+    if (val < 0 || val > 255)
+        return 0;
+    return 1;
+}
+
 char is_valid_ip(const uint8_t *p)
 {
     char ip[IP_ADDR_LEN] = {0};
@@ -56,16 +76,18 @@ char is_valid_ip(const uint8_t *p)
 
     char *token = strtok((char *)ip, ".");
     char oct = 0;
+    errno = 0;
+    char *temp = 0;
     while (token != NULL)
     {
         oct += 1;
 #ifdef DEBUG
         printf("%d octet: %s\n", oct, token);
 #endif
-        if (strtol(token, NULL, 10) == 0)
-        {
+
+        if (!is_valid_octet(token))
             return 0;
-        }
+
         token = strtok(NULL, ".");
     }
 #ifdef DEBUG
@@ -114,7 +136,7 @@ int main(int argc, char *argv[])
     trace_data->callback = getTrace;
     if (is_valid_ip(trace_data->des_ip) == 0)
     {
-        printf("Input Error: Give valid ip!\n");
+        printf(RED "Input Error: Give valid ip!\n" RESET);
         return 0;
     }
 
