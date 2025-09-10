@@ -43,7 +43,7 @@ void getTrace(double ms1, double ms2, double ms3, char offender_ip1[], char offe
             printf(GREEN "[%s]" RESET, domain[2]);
         printf(YELLOW "(%s)" RESET " %.3lf ms   ", offender_ip3, ms3);
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 char is_valid_octet(char *token)
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
     printf("................................................\n");
 #endif
 
-    printf("Tracing route to " YELLOW "%s\n\n" RESET, trace_data->des_ip);
+    printf("\nTracing route to " YELLOW "%s" RESET ", Max Hop: %d\n\n", trace_data->des_ip, (trace_data->max_hop == 0 ? DEFAULT_MAX_HOP : trace_data->max_hop));
     int ret = startTrace();
     if (ret < 0)
         printf(RED "Error: Some Error occured. For more information use -e option\n" RESET);
