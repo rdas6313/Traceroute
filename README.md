@@ -58,10 +58,8 @@ sudo ./Traceroute -e -t 2 -p 33434 -m 20 8.8.8.8
 
 ## Screenshots
 
-![Screenshot1](https://via.placeholder.com/468x300?text=App+Screenshot+Here)
-![Screenshot2](https://via.placeholder.com/468x300?text=App+Screenshot+Here)
-![Screenshot3](https://via.placeholder.com/468x300?text=App+Screenshot+Here)
-
+![Screenshot1](asset/s1.png)
+![Screenshot2](asset/s2.png)
 
 ## Demo
 
